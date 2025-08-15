@@ -17,6 +17,8 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
   const [cameraStarted, setCameraStarted] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [showStartButton, setShowStartButton] = useState(false);
+  const [buttonVisible, setButtonVisible] = useState(false);
 
   useEffect(() => {
     // Cargar MediaPipe dinámicamente solo en el cliente
@@ -38,7 +40,10 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
         (window as any).FACEMESH_TESSELATION = faceMeshModule.FACEMESH_TESSELATION;
         
         setIsLoaded(true);
+        setShowStartButton(true);
+        setButtonVisible(true);
         setDebugInfo('MediaPipe cargado - Listo para iniciar cámara');
+        console.log('Botón debería ser visible ahora');
       } catch (err) {
         console.error('Error al cargar MediaPipe:', err);
         setError('Error al cargar la librería de seguimiento facial: ' + (err as Error).message);
@@ -52,20 +57,12 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
   const startCamera = async () => {
     console.log('Botón de iniciar cámara presionado');
     setDebugInfo('Iniciando cámara...');
+    setButtonVisible(false);
     
-    if (!isLoaded) {
-      console.log('MediaPipe no está cargado aún');
-      setError('Por favor, espera a que la tecnología se cargue completamente');
-      setDebugInfo('MediaPipe no está cargado');
-      return;
-    }
-
     try {
       console.log('Creando instancia de FaceMesh');
       // @ts-ignore - Usar FaceMesh desde window
       const FaceMesh = (window as any).FaceMesh;
-      // @ts-ignore - Usar CameraUtils desde window
-      const CameraUtils = (window as any).CameraUtils;
 
       const faceMeshInstance = new FaceMesh({
         locateFile: (file: string) => {
@@ -89,6 +86,7 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
       if (!videoRef.current) {
         console.error('Elemento de video no encontrado');
         setError('No se encontró el elemento de video');
+        setButtonVisible(true);
         return;
       }
 
@@ -133,6 +131,7 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
     } catch (err: any) {
       console.error('Error al inicializar la cámara:', err);
       setDebugInfo(`Error: ${err.name} - ${err.message}`);
+      setButtonVisible(true);
       
       if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
         setPermissionDenied(true);
@@ -155,6 +154,7 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
     }
     setIsTracking(false);
     setCameraStarted(false);
+    setButtonVisible(true);
     setDebugInfo('Cámara detenida');
   };
 
@@ -244,6 +244,11 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
       {debugInfo && (
         <div className="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-2 rounded mb-4 text-sm">
           <strong>Depuración:</strong> {debugInfo}
+          <div className="mt-1">
+            <strong>Botón visible:</strong> {buttonVisible ? 'Sí' : 'No'} | 
+            <strong> Cargado:</strong> {isLoaded ? 'Sí' : 'No'} | 
+            <strong> Seguimiento:</strong> {isTracking ? 'Sí' : 'No'}
+          </div>
         </div>
       )}
 
@@ -304,12 +309,21 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
                     <p className="text-gray-300 mb-6">
                       Haz clic en el botón para iniciar la cámara y comenzar el seguimiento facial
                     </p>
+                    
+                    {/* Botón siempre visible cuando está cargado y no está en seguimiento */}
                     <button
                       onClick={startCamera}
                       className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-full font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-300"
                     >
                       Iniciar Cámara
                     </button>
+                    
+                    {/* Mensaje de depuración para el botón */}
+                    {!buttonVisible && (
+                      <div className="mt-4 text-yellow-300 text-sm">
+                        Botón oculto por estado buttonVisible={buttonVisible}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
