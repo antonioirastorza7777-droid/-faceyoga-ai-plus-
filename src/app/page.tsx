@@ -1,8 +1,9 @@
-// app/(routes)/page.tsx
+// src/app/page.tsx
 'use client';
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function HomePage() {
   const router = useRouter();
@@ -50,7 +51,7 @@ export default function HomePage() {
             ayudándote a rejuvenecer tu piel y tonificar tus músculos faciales.
           </p>
           
-          <div className="flex flex-col sm:flex-row justify-center gap-6 mb-16">
+          <div className="flex flex-col sm:flex-row justify-center gap-6 mb-8">
             <button 
               onClick={handleStartFree}
               className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-full font-medium text-lg hover:shadow-lg transform hover:scale-105 transition-all duration-300"
@@ -66,8 +67,21 @@ export default function HomePage() {
             </button>
           </div>
 
+          {/* ENLACE AÑADIDO - Paso 4 */}
+          <div className="mt-6">
+            <Link 
+              href="/tracking"
+              className="inline-flex items-center text-purple-600 hover:text-purple-800 font-medium text-lg"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Probar Seguimiento Facial
+            </Link>
+          </div>
+
           {/* Placeholder para imagen/animación */}
-          <div className="relative max-w-3xl mx-auto">
+          <div className="relative max-w-3xl mx-auto mt-16">
             <div className="aspect-video bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center">
               <div className="text-center">
                 <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center mx-auto mb-4">
