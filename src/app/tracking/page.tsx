@@ -7,14 +7,9 @@ import Link from 'next/link';
 
 export default function TrackingPage() {
   const [landmarksCount, setLandmarksCount] = useState(0);
-  const [isActive, setIsActive] = useState(true);
 
   const handleFaceDetected = (landmarks: any[]) => {
     setLandmarksCount(landmarks.length);
-  };
-
-  const toggleTracking = () => {
-    setIsActive(!isActive);
   };
 
   return (
@@ -61,23 +56,11 @@ export default function TrackingPage() {
                 </div>
               </div>
             </div>
-
-            <button
-              onClick={toggleTracking}
-              className={`px-6 py-3 rounded-lg font-medium mb-6 ${
-                isActive
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-green-500 hover:bg-green-600 text-white'
-              }`}
-            >
-              {isActive ? 'Pausar Seguimiento' : 'Iniciar Seguimiento'}
-            </button>
           </div>
 
           {/* Componente de Seguimiento Facial */}
           <FacialTracking
             onFaceDetected={handleFaceDetected}
-            isActive={isActive}
           />
 
           {/* Información Adicional */}

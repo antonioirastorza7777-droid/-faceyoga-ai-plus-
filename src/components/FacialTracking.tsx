@@ -14,6 +14,8 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [cameraStarted, setCameraStarted] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   useEffect(() => {
     // Cargar MediaPipe dinámicamente solo en el cliente
@@ -39,64 +41,80 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
     loadMediaPipe();
   }, []);
 
-  useEffect(() => {
-    if (!isActive || !isLoaded) return;
+  const startCamera = async () => {
+    if (!isLoaded) {
+      setError('Por favor, espera a que la tecnología se cargue completamente');
+      return;
+    }
 
-    let faceMeshInstance: any;
-    let camera: any;
+    try {
+      // @ts-ignore - Usar FaceMesh desde window
+      const FaceMesh = (window as any).FaceMesh;
+      // @ts-ignore - Usar CameraUtils desde window
+      const CameraUtils = (window as any).CameraUtils;
 
-    const initializeTracking = async () => {
-      try {
-        // @ts-ignore - Usar FaceMesh desde window
-        const FaceMesh = (window as any).FaceMesh;
-        // @ts-ignore - Usar CameraUtils desde window
-        const CameraUtils = (window as any).CameraUtils;
+      const faceMeshInstance = new FaceMesh({
+        locateFile: (file: string) => {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+        }
+      });
 
-        faceMeshInstance = new FaceMesh({
-          locateFile: (file: string) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+      faceMeshInstance.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      faceMeshInstance.onResults(onResults);
+
+      if (!videoRef.current) return;
+
+      const camera = new CameraUtils(videoRef.current, {
+        onFrame: async () => {
+          if (videoRef.current) {
+            await faceMeshInstance.send({ image: videoRef.current });
           }
-        });
+        },
+        width: 640,
+        height: 480
+      });
 
-        faceMeshInstance.setOptions({
-          maxNumFaces: 1,
-          refineLandmarks: true,
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5
-        });
-
-        faceMeshInstance.onResults(onResults);
-
-        if (!videoRef.current) return;
-
-        camera = new CameraUtils(videoRef.current, {
-          onFrame: async () => {
-            if (videoRef.current) {
-              await faceMeshInstance.send({ image: videoRef.current });
-            }
-          },
-          width: 640,
-          height: 480
-        });
-
-        await camera.start();
-        setIsTracking(true);
-        setError(null);
-      } catch (err) {
-        console.error('Error al inicializar la cámara:', err);
-        setError('No se pudo acceder a la cámara. Asegúrate de dar permisos.');
-        setIsTracking(false);
+      await camera.start();
+      setIsTracking(true);
+      setCameraStarted(true);
+      setPermissionDenied(false);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error al inicializar la cámara:', err);
+      
+      if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
+        setPermissionDenied(true);
+        setError('Permiso de cámara denegado. Por favor, permite el acceso a la cámara en la configuración de tu navegador.');
+      } else if (err.name === 'NotFoundError') {
+        setError('No se encontró ninguna cámara. Asegúrate de tener una cámara conectada.');
+      } else {
+        setError('No se pudo acceder a la cámara. Por favor, verifica los permisos y que tengas una cámara conectada.');
       }
-    };
+      setIsTracking(false);
+    }
+  };
 
-    initializeTracking();
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsTracking(false);
+    setCameraStarted(false);
+  };
 
-    return () => {
-      if (camera) {
-        camera.stop();
-      }
-    };
-  }, [isActive, isLoaded]);
+  useEffect(() => {
+    if (!isActive && cameraStarted) {
+      stopCamera();
+    }
+  }, [isActive, cameraStarted]);
 
   const onResults = (results: any) => {
     if (!canvasRef.current || !videoRef.current) return;
@@ -175,8 +193,22 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
   return (
     <div className="relative w-full max-w-2xl mx-auto">
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+        <div className={`border px-4 py-3 rounded mb-4 ${
+          permissionDenied 
+            ? 'bg-yellow-100 border-yellow-400 text-yellow-700' 
+            : 'bg-red-100 border-red-400 text-red-700'
+        }`}>
+          <div className="font-medium">{error}</div>
+          {permissionDenied && (
+            <div className="mt-2 text-sm">
+              <p className="mb-2">Para habilitar la cámara:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Haz clic en el icono de candado o información en la barra de direcciones</li>
+                <li>Busca "Cámara" y selecciona "Permitir"</li>
+                <li>Recarga la página y haz clic en "Iniciar Cámara" nuevamente</li>
+              </ol>
+            </div>
+          )}
         </div>
       )}
       
@@ -192,7 +224,6 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
           className="w-full h-auto transform scale-x-[-1]"
           playsInline
           muted
-          autoPlay
           style={{ display: isTracking ? 'block' : 'none' }}
         />
         
@@ -203,19 +234,57 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
           height="480"
         />
         
-        {!isTracking && !error && (
+        {!isTracking && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-            <div className="text-white text-center">
+            <div className="text-white text-center p-8">
               {isLoaded ? (
-                <>
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                  <p>Iniciando cámara...</p>
-                </>
+                <div className="space-y-6">
+                  <div className="w-24 h-24 rounded-full bg-purple-600 flex items-center justify-center mx-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">Seguimiento Facial IA</h3>
+                    <p className="text-gray-300 mb-6">
+                      Haz clic en el botón para iniciar la cámara y comenzar el seguimiento facial
+                    </p>
+                    <button
+                      onClick={startCamera}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-full font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                    >
+                      Iniciar Cámara
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <p>Cargando tecnología de IA...</p>
+                <div className="space-y-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+                  <p>Cargando tecnología de IA...</p>
+                </div>
               )}
             </div>
           </div>
+        )}
+      </div>
+      
+      <div className="mt-6 flex justify-center space-x-4">
+        {isTracking && (
+          <button
+            onClick={stopCamera}
+            className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition"
+          >
+            Detener Cámara
+          </button>
+        )}
+        
+        {permissionDenied && (
+          <button
+            onClick={startCamera}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg font-medium transition"
+          >
+            Reintentar
+          </button>
         )}
       </div>
       
