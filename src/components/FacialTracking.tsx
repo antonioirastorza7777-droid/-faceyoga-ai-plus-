@@ -2,11 +2,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import * as faceMesh from '@mediapipe/face_mesh';
-import * as cameraUtils from '@mediapipe/camera_utils';
 
 interface FacialTrackingProps {
-  onFaceDetected?: (landmarks: faceMesh.NormalizedLandmark[]) => void;
+  onFaceDetected?: (landmarks: any[]) => void;
   isActive?: boolean;
 }
 
@@ -15,32 +13,63 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (!isActive) return;
-
-    const faceMeshInstance = new faceMesh.FaceMesh({
-      locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-      }
-    });
-
-    faceMeshInstance.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
-
-    faceMeshInstance.onResults(onResults);
-
-    let camera: cameraUtils.Camera | null = null;
-
-    const initializeCamera = async () => {
+    // Cargar MediaPipe dinámicamente solo en el cliente
+    const loadMediaPipe = async () => {
       try {
+        // @ts-ignore - MediaPipe se carga dinámicamente
+        const faceMeshModule = await import('@mediapipe/face_mesh');
+        // @ts-ignore - MediaPipe se carga dinámicamente
+        const cameraUtilsModule = await import('@mediapipe/camera_utils');
+        
+        // Guardar las funciones en el window para uso posterior
+        (window as any).FaceMesh = faceMeshModule.FaceMesh;
+        (window as any).CameraUtils = cameraUtilsModule.CameraUtils;
+        (window as any).FACEMESH_TESSELATION = faceMeshModule.FACEMESH_TESSELATION;
+        
+        setIsLoaded(true);
+      } catch (err) {
+        console.error('Error al cargar MediaPipe:', err);
+        setError('Error al cargar la librería de seguimiento facial');
+      }
+    };
+
+    loadMediaPipe();
+  }, []);
+
+  useEffect(() => {
+    if (!isActive || !isLoaded) return;
+
+    let faceMeshInstance: any;
+    let camera: any;
+
+    const initializeTracking = async () => {
+      try {
+        // @ts-ignore - Usar FaceMesh desde window
+        const FaceMesh = (window as any).FaceMesh;
+        // @ts-ignore - Usar CameraUtils desde window
+        const CameraUtils = (window as any).CameraUtils;
+
+        faceMeshInstance = new FaceMesh({
+          locateFile: (file: string) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+          }
+        });
+
+        faceMeshInstance.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: true,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+
+        faceMeshInstance.onResults(onResults);
+
         if (!videoRef.current) return;
 
-        camera = new cameraUtils.Camera(videoRef.current, {
+        camera = new CameraUtils(videoRef.current, {
           onFrame: async () => {
             if (videoRef.current) {
               await faceMeshInstance.send({ image: videoRef.current });
@@ -60,16 +89,16 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
       }
     };
 
-    initializeCamera();
+    initializeTracking();
 
     return () => {
       if (camera) {
         camera.stop();
       }
     };
-  }, [isActive]);
+  }, [isActive, isLoaded]);
 
-  const onResults = (results: faceMesh.Results) => {
+  const onResults = (results: any) => {
     if (!canvasRef.current || !videoRef.current) return;
 
     const canvasCtx = canvasRef.current.getContext('2d');
@@ -95,7 +124,9 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
       });
 
       // Dibujar conexiones (contorno facial)
-      drawConnectors(canvasCtx, landmarks, faceMesh.FACEMESH_TESSELATION, {
+      // @ts-ignore - Usar FACEMESH_TESSELATION desde window
+      const FACEMESH_TESSELATION = (window as any).FACEMESH_TESSELATION;
+      drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {
         color: '#C0C0C070',
         lineWidth: 1
       });
@@ -106,7 +137,7 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
 
   const drawLandmarks = (
     ctx: CanvasRenderingContext2D,
-    landmarks: faceMesh.NormalizedLandmark[],
+    landmarks: any[],
     options: { color: string; lineWidth: number; radius: number }
   ) => {
     ctx.fillStyle = options.color;
@@ -121,7 +152,7 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
 
   const drawConnectors = (
     ctx: CanvasRenderingContext2D,
-    landmarks: faceMesh.NormalizedLandmark[],
+    landmarks: any[],
     connections: number[][],
     options: { color: string; lineWidth: number }
   ) => {
@@ -149,6 +180,12 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
         </div>
       )}
       
+      {!isLoaded && (
+        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
+          Cargando librería de seguimiento facial...
+        </div>
+      )}
+      
       <div className="relative rounded-lg overflow-hidden bg-gray-900">
         <video
           ref={videoRef}
@@ -169,8 +206,14 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
         {!isTracking && !error && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
             <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-              <p>Iniciando cámara...</p>
+              {isLoaded ? (
+                <>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                  <p>Iniciando cámara...</p>
+                </>
+              ) : (
+                <p>Cargando tecnología de IA...</p>
+              )}
             </div>
           </div>
         )}
