@@ -16,15 +16,21 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
   const [isLoaded, setIsLoaded] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     // Cargar MediaPipe dinámicamente solo en el cliente
     const loadMediaPipe = async () => {
       try {
+        setDebugInfo('Cargando MediaPipe...');
+        console.log('Iniciando carga de MediaPipe');
+        
         // @ts-ignore - MediaPipe se carga dinámicamente
         const faceMeshModule = await import('@mediapipe/face_mesh');
         // @ts-ignore - MediaPipe se carga dinámicamente
         const cameraUtilsModule = await import('@mediapipe/camera_utils');
+        
+        console.log('MediaPipe cargado correctamente');
         
         // Guardar las funciones en el window para uso posterior
         (window as any).FaceMesh = faceMeshModule.FaceMesh;
@@ -32,9 +38,11 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
         (window as any).FACEMESH_TESSELATION = faceMeshModule.FACEMESH_TESSELATION;
         
         setIsLoaded(true);
+        setDebugInfo('MediaPipe cargado - Listo para iniciar cámara');
       } catch (err) {
         console.error('Error al cargar MediaPipe:', err);
-        setError('Error al cargar la librería de seguimiento facial');
+        setError('Error al cargar la librería de seguimiento facial: ' + (err as Error).message);
+        setDebugInfo('Error al cargar MediaPipe');
       }
     };
 
@@ -42,12 +50,18 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
   }, []);
 
   const startCamera = async () => {
+    console.log('Botón de iniciar cámara presionado');
+    setDebugInfo('Iniciando cámara...');
+    
     if (!isLoaded) {
+      console.log('MediaPipe no está cargado aún');
       setError('Por favor, espera a que la tecnología se cargue completamente');
+      setDebugInfo('MediaPipe no está cargado');
       return;
     }
 
     try {
+      console.log('Creando instancia de FaceMesh');
       // @ts-ignore - Usar FaceMesh desde window
       const FaceMesh = (window as any).FaceMesh;
       // @ts-ignore - Usar CameraUtils desde window
@@ -55,6 +69,7 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
 
       const faceMeshInstance = new FaceMesh({
         locateFile: (file: string) => {
+          console.log(`Cargando archivo: ${file}`);
           return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
         }
       });
@@ -66,27 +81,58 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
         minTrackingConfidence: 0.5
       });
 
-      faceMeshInstance.onResults(onResults);
-
-      if (!videoRef.current) return;
-
-      const camera = new CameraUtils(videoRef.current, {
-        onFrame: async () => {
-          if (videoRef.current) {
-            await faceMeshInstance.send({ image: videoRef.current });
-          }
-        },
-        width: 640,
-        height: 480
+      faceMeshInstance.onResults((results: any) => {
+        console.log('Resultados recibidos:', results.multiFaceLandmarks?.length || 0, 'caras detectadas');
+        onResults(results);
       });
 
-      await camera.start();
+      if (!videoRef.current) {
+        console.error('Elemento de video no encontrado');
+        setError('No se encontró el elemento de video');
+        return;
+      }
+
+      console.log('Iniciando cámara...');
+      setDebugInfo('Solicitando permisos de cámara...');
+
+      // Primero, solicitar acceso a la cámara directamente
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: 640, 
+          height: 480,
+          facingMode: 'user'
+        } 
+      });
+      
+      console.log('Permisos de cámara concedidos');
+      setDebugInfo('Permisos concedidos - Iniciando seguimiento...');
+
+      // Asignar el stream al video
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+
+      // Configurar el bucle de procesamiento
+      const processFrame = async () => {
+        if (videoRef.current && faceMeshInstance) {
+          await faceMeshInstance.send({ image: videoRef.current });
+        }
+        if (isTracking) {
+          requestAnimationFrame(processFrame);
+        }
+      };
+
       setIsTracking(true);
       setCameraStarted(true);
       setPermissionDenied(false);
       setError(null);
+      setDebugInfo('Seguimiento facial activo');
+      
+      // Iniciar el procesamiento de frames
+      processFrame();
+
     } catch (err: any) {
       console.error('Error al inicializar la cámara:', err);
+      setDebugInfo(`Error: ${err.name} - ${err.message}`);
       
       if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
         setPermissionDenied(true);
@@ -94,13 +140,14 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
       } else if (err.name === 'NotFoundError') {
         setError('No se encontró ninguna cámara. Asegúrate de tener una cámara conectada.');
       } else {
-        setError('No se pudo acceder a la cámara. Por favor, verifica los permisos y que tengas una cámara conectada.');
+        setError(`No se pudo acceder a la cámara: ${err.message}`);
       }
       setIsTracking(false);
     }
   };
 
   const stopCamera = () => {
+    console.log('Deteniendo cámara');
     if (videoRef.current && videoRef.current.srcObject) {
       const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
       tracks.forEach(track => track.stop());
@@ -108,6 +155,7 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
     }
     setIsTracking(false);
     setCameraStarted(false);
+    setDebugInfo('Cámara detenida');
   };
 
   useEffect(() => {
@@ -192,6 +240,13 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
 
   return (
     <div className="relative w-full max-w-2xl mx-auto">
+      {/* Información de depuración */}
+      {debugInfo && (
+        <div className="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-2 rounded mb-4 text-sm">
+          <strong>Depuración:</strong> {debugInfo}
+        </div>
+      )}
+
       {error && (
         <div className={`border px-4 py-3 rounded mb-4 ${
           permissionDenied 
