@@ -3,25 +3,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-interface FacialTrackingProps {
-  onFaceDetected?: (landmarks: any[]) => void;
-  isActive?: boolean;
-}
-
-export default function FacialTracking({ onFaceDetected, isActive = true }: FacialTrackingProps) {
+export default function FacialTracking() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isTracking, setIsTracking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [cameraStarted, setCameraStarted] = useState(false);
-  const [permissionDenied, setPermissionDenied] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
-  const [showStartButton, setShowStartButton] = useState(false);
-  const [buttonVisible, setButtonVisible] = useState(false);
 
   useEffect(() => {
-    // Cargar MediaPipe dinámicamente solo en el cliente
     const loadMediaPipe = async () => {
       try {
         setDebugInfo('Cargando MediaPipe...');
@@ -40,13 +29,9 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
         (window as any).FACEMESH_TESSELATION = faceMeshModule.FACEMESH_TESSELATION;
         
         setIsLoaded(true);
-        setShowStartButton(true);
-        setButtonVisible(true);
         setDebugInfo('MediaPipe cargado - Listo para iniciar cámara');
-        console.log('Botón debería ser visible ahora');
       } catch (err) {
         console.error('Error al cargar MediaPipe:', err);
-        setError('Error al cargar la librería de seguimiento facial: ' + (err as Error).message);
         setDebugInfo('Error al cargar MediaPipe');
       }
     };
@@ -57,10 +42,8 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
   const startCamera = async () => {
     console.log('Botón de iniciar cámara presionado');
     setDebugInfo('Iniciando cámara...');
-    setButtonVisible(false);
     
     try {
-      console.log('Creando instancia de FaceMesh');
       // @ts-ignore - Usar FaceMesh desde window
       const FaceMesh = (window as any).FaceMesh;
 
@@ -85,15 +68,13 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
 
       if (!videoRef.current) {
         console.error('Elemento de video no encontrado');
-        setError('No se encontró el elemento de video');
-        setButtonVisible(true);
         return;
       }
 
       console.log('Iniciando cámara...');
       setDebugInfo('Solicitando permisos de cámara...');
 
-      // Primero, solicitar acceso a la cámara directamente
+      // Solicitar acceso a la cámara directamente
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           width: 640, 
@@ -120,9 +101,6 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
       };
 
       setIsTracking(true);
-      setCameraStarted(true);
-      setPermissionDenied(false);
-      setError(null);
       setDebugInfo('Seguimiento facial activo');
       
       // Iniciar el procesamiento de frames
@@ -130,17 +108,7 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
 
     } catch (err: any) {
       console.error('Error al inicializar la cámara:', err);
-      setDebugInfo(`Error: ${err.name} - ${err.message}`);
-      setButtonVisible(true);
-      
-      if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
-        setPermissionDenied(true);
-        setError('Permiso de cámara denegado. Por favor, permite el acceso a la cámara en la configuración de tu navegador.');
-      } else if (err.name === 'NotFoundError') {
-        setError('No se encontró ninguna cámara. Asegúrate de tener una cámara conectada.');
-      } else {
-        setError(`No se pudo acceder a la cámara: ${err.message}`);
-      }
+      setDebugInfo(`Error: ${err.message}`);
       setIsTracking(false);
     }
   };
@@ -153,16 +121,8 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
       videoRef.current.srcObject = null;
     }
     setIsTracking(false);
-    setCameraStarted(false);
-    setButtonVisible(true);
     setDebugInfo('Cámara detenida');
   };
-
-  useEffect(() => {
-    if (!isActive && cameraStarted) {
-      stopCamera();
-    }
-  }, [isActive, cameraStarted]);
 
   const onResults = (results: any) => {
     if (!canvasRef.current || !videoRef.current) return;
@@ -176,11 +136,6 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
 
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
       const landmarks = results.multiFaceLandmarks[0];
-      
-      // Llamar al callback con los puntos faciales
-      if (onFaceDetected) {
-        onFaceDetected(landmarks);
-      }
 
       // Dibujar los puntos faciales
       drawLandmarks(canvasCtx, landmarks, {
@@ -244,37 +199,6 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
       {debugInfo && (
         <div className="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-2 rounded mb-4 text-sm">
           <strong>Depuración:</strong> {debugInfo}
-          <div className="mt-1">
-            <strong>Botón visible:</strong> {buttonVisible ? 'Sí' : 'No'} | 
-            <strong> Cargado:</strong> {isLoaded ? 'Sí' : 'No'} | 
-            <strong> Seguimiento:</strong> {isTracking ? 'Sí' : 'No'}
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className={`border px-4 py-3 rounded mb-4 ${
-          permissionDenied 
-            ? 'bg-yellow-100 border-yellow-400 text-yellow-700' 
-            : 'bg-red-100 border-red-400 text-red-700'
-        }`}>
-          <div className="font-medium">{error}</div>
-          {permissionDenied && (
-            <div className="mt-2 text-sm">
-              <p className="mb-2">Para habilitar la cámara:</p>
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Haz clic en el icono de candado o información en la barra de direcciones</li>
-                <li>Busca "Cámara" y selecciona "Permitir"</li>
-                <li>Recarga la página y haz clic en "Iniciar Cámara" nuevamente</li>
-              </ol>
-            </div>
-          )}
-        </div>
-      )}
-      
-      {!isLoaded && (
-        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
-          Cargando librería de seguimiento facial...
         </div>
       )}
       
@@ -309,21 +233,12 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
                     <p className="text-gray-300 mb-6">
                       Haz clic en el botón para iniciar la cámara y comenzar el seguimiento facial
                     </p>
-                    
-                    {/* Botón siempre visible cuando está cargado y no está en seguimiento */}
                     <button
                       onClick={startCamera}
                       className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-full font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-300"
                     >
                       Iniciar Cámara
                     </button>
-                    
-                    {/* Mensaje de depuración para el botón */}
-                    {!buttonVisible && (
-                      <div className="mt-4 text-yellow-300 text-sm">
-                        Botón oculto por estado buttonVisible={buttonVisible}
-                      </div>
-                    )}
                   </div>
                 </div>
               ) : (
@@ -337,22 +252,13 @@ export default function FacialTracking({ onFaceDetected, isActive = true }: Faci
         )}
       </div>
       
-      <div className="mt-6 flex justify-center space-x-4">
+      <div className="mt-6 flex justify-center">
         {isTracking && (
           <button
             onClick={stopCamera}
             className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition"
           >
             Detener Cámara
-          </button>
-        )}
-        
-        {permissionDenied && (
-          <button
-            onClick={startCamera}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg font-medium transition"
-          >
-            Reintentar
           </button>
         )}
       </div>
