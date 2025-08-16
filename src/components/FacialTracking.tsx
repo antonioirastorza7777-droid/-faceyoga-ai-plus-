@@ -3,7 +3,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-export default function FacialTracking() {
+interface FacialTrackingProps {
+  onFaceDetected?: (landmarks: any[]) => void;
+  isActive?: boolean;
+}
+
+export default function FacialTracking({ onFaceDetected, isActive = true }: FacialTrackingProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isTracking, setIsTracking] = useState(false);
@@ -224,7 +229,7 @@ export default function FacialTracking() {
               {isLoaded ? (
                 <div className="space-y-6">
                   <div className="w-24 h-24 rounded-full bg-purple-600 flex items-center justify-center mx-auto">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none, viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>

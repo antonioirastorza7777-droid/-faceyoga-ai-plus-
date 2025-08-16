@@ -37,7 +37,7 @@ export default function HomePage() {
         </nav>
       </header>
 
-      {/* Hero Section - Estilo Original */}
+      {/* Hero Section */}
       <section className="container mx-auto px-4 py-16 md:py-24">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-5xl md:text-7xl font-bold text-gray-800 mb-6">
@@ -67,7 +67,7 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* ENLACE AÑADIDO - Paso 4 */}
+          {/* Enlace a seguimiento facial */}
           <div className="mt-6">
             <Link 
               href="/tracking"
@@ -78,20 +78,6 @@ export default function HomePage() {
               </svg>
               Probar Seguimiento Facial
             </Link>
-          </div>
-
-          {/* Placeholder para imagen/animación */}
-          <div className="relative max-w-3xl mx-auto mt-16">
-            <div className="aspect-video bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center mx-auto mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-gray-600">Demostración de seguimiento facial IA</p>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -115,7 +101,7 @@ export default function HomePage() {
               
               <div className="aspect-video bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg flex items-center justify-center mb-4">
                 <div className="text-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-purple-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-purple-600 mb-2" fill="none, viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
